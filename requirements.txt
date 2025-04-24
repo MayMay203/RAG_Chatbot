@@ -1,0 +1,35 @@
+# Core
+Django==5.0.3
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+python-dotenv==1.0.0
+
+# Database
+psycopg2-binary==2.9.9
+
+# AI và xử lý ngôn ngữ tự nhiên
+openai==1.12.0
+langchain==0.1.9
+chromadb==0.4.22
+sentence-transformers==2.5.1
+
+# Xử lý tài liệu
+python-multipart==0.0.9
+python-magic==0.4.27
+pdf2image==1.17.0
+pytesseract==0.3.10
+Pillow==10.2.0
+
+# Vector Database
+qdrant-client==1.7.0
+
+# Tiện ích
+tqdm==4.66.2
+python-jose==3.3.0
+pydantic==2.5.2
+
+# Development
+black==24.2.0
+isort==5.13.2
+flake8==7.0.0
+django-environ==0.11.2

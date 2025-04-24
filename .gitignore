@@ -1,0 +1,13 @@
+#  Enviroment Files
+venv
+
+
+# Ignoring pychache Files
+__pychache__/*
+__pycache__/
+*.pyc
+
+.env
+*.env
+.env.*
+!.env.example
