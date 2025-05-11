@@ -3,52 +3,35 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from .llm_model import (get_llm_qdrant)
+import jwt
+import os
 
 
 class MessageView(APIView):
     permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
-        print(request)
-        # conversation_id =  request.data.get('conversation_id')
-        # conversation = Conversation.objects.filter(id=conversation_id, user=request.user).first()
-        
-        # if conversation is None:
-        #     return Response({'detail': 'Conversation not found'}, status=status.HTTP_404_NOT_FOUND)
+    def post(self, request):
+        try:
+            conversationId =  request.data.get('conversationId')
+            query = request.data.get("query")
+            storeCollections = request.data.get('materialsByStore')
+            accessToken = request.data.get('accessToken')
 
-        prompt = request.data.get("prompt")
-        print('promtttt: ', prompt)
-        # response = get_llm_qdrant(prompt, conversation_id)
-        response = get_llm_qdrant(prompt)
-        # message = Message(
-        #     conversation=conversation,
-        #     query=prompt,
-        #     response=response
-        # )
-        # message.save()
-        
-        # Saving the last message to get conversations more faster
-        # conversation.last_message = response
-        # conversation.save()
-        # logger.info(f"Answer from GPT for prompt '{prompt}' Asked By User {request.user}  is {response}")
-        # return Response(
-        #     MessageSerializer(message).data,
-        #     status=status.HTTP_200_OK
-        # )
-        return Response(
-            response,
-            status=status.HTTP_200_OK
-        )
+            SECRET_KEY = os.getenv("JWT_ACCESS_SECRET")
+            decoded_token = jwt.decode(accessToken, SECRET_KEY, algorithms=["HS256"])
+            roleId = decoded_token['roleId']
 
-    def get(self, request, *args, **kwargs):
-        conversation_id =  request.query_params.get('conversation_id', 0)
-        conversation = Conversation.objects.filter(id=conversation_id, user=request.user).first()
-        
-        if conversation is None:
-            return Response({'detail': 'Conversation not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        messages = Message.objects.filter(conversation__id=conversation_id)
-        serializer = MessageSerializer(messages, many=True)
+            # response = get_llm_qdrant(conversationId, query, storeCollections, filter, roleId)
 
-        return Response(serializer.data,status=status.HTTP_200_OK)
+            return Response(
+                'jojo',
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            print(error_message)
+            return Response(
+                {"error": error_message},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     

@@ -73,9 +73,6 @@ class DocumentProcessingView(APIView):
                             content = df.to_string(index=False)
 
                         elif "image" in content_type or ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]:
-                            # Định nghĩa các ký tự cho phép
-                            allowed_chars = string.ascii_letters + string.digits + " "
-
                             # Mở ảnh và tiền xử lý
                             image = Image.open(io.BytesIO(response.content))
                             custom_config = r'--psm 6 -c preserve_interword_spaces=1'
