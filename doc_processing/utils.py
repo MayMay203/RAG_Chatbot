@@ -2,23 +2,12 @@ from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 from qdrant_client import QdrantClient,models
 from qdrant_client.http.models import PointStruct
+from sentence_transformers import SentenceTransformer
 import uuid
-
-
-
-
-def read_data_from_pdf(pdf_path):
-  text = ""
-  with open(pdf_path, 'rb') as file:
-    pdf_reader = PdfReader(file)
-    for page in pdf_reader.pages:
-      text += page.extract_text()
-  return text
-
 
 def get_text_chunks(text):
   text_splitter = CharacterTextSplitter(
-    separator="\n", # tách văn bản tại dấu xuônsg dòng
+    separator="\n", # tách văn bản tại dấu xuống dòng
     chunk_size=1000, # độ dài tối đa
     chunk_overlap=200, # độ chồng lắp
     length_function=len) #hàm tính độ dài
@@ -26,35 +15,25 @@ def get_text_chunks(text):
   return chunks
 
 
-# def get_embedding(text_chunks, model_id="text-embedding-ada-002"):
-#     points = []
-#     for idx, chunk in enumerate(text_chunks):
-#         response = open_ai.Embedding.create(
-#             input=chunk,
-#             model=model_id
-#         )
-#         embeddings = response['data'][0]['embedding']
-#         points.append(PointStruct(id=str(uuid.uuid4()), vector=embeddings,
-#                                    payload={"text": chunk}))
-
-#     return points
-
-
 # Custom
-from sentence_transformers import SentenceTransformer
-import uuid
-
 # Load model local -> chuyển text thành vector 384 chiều
 model = SentenceTransformer('all-MiniLM-L6-v2')
-def get_embedding(text_chunks):
+def get_embedding(text_chunks, material):
     points = []
-    embeddings = model.encode(text_chunks)  # Nhận list các vector
+    embeddings = model.encode(text_chunks)  # Nhận list các vector embedding
 
+    #  Mỗi chunk ứng với enbedding tương ứng
     for chunk, emb in zip(text_chunks, embeddings):
         points.append(PointStruct(
             id=str(uuid.uuid4()),
             vector=emb.tolist(),  # Chuyển về list nếu cần lưu
-            payload={"text": chunk}
+            payload={
+              "text": chunk,
+              "materialId": material['id'],
+              "materialType": material['materialType'],
+              "accessType": material['accessType'],
+              "knowledgeStore": material['knowledgeStore']
+            }
         ))
 
     return points
@@ -77,3 +56,17 @@ def add_points_qdrant(collection_name, points):
     connection.upsert(collection_name=collection_name, points=points)
     
     return True
+
+
+# def get_embedding(text_chunks, model_id="text-embedding-ada-002"):
+#     points = []
+#     for idx, chunk in enumerate(text_chunks):
+#         response = open_ai.Embedding.create(
+#             input=chunk,
+#             model=model_id
+#         )
+#         embeddings = response['data'][0]['embedding']
+#         points.append(PointStruct(id=str(uuid.uuid4()), vector=embeddings,
+#                                    payload={"text": chunk}))
+
+#     return points
