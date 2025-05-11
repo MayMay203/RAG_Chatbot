@@ -56,6 +56,9 @@ import pandas as pd
 from docx import Document
 import zipfile
 import docx2txt 
+from PIL import Image
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract-OCR\tesseract.exe'
 
 class DocumentProcessingView(APIView):
     permission_classes=[AllowAny]
@@ -143,9 +146,6 @@ class DocumentProcessingView(APIView):
                         print(f"[Excel/CSV Content] {df.head()}")
 
                     elif "image" in content_type or ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]:
-                        from PIL import Image
-                        import pytesseract
-
                         # Mở hình ảnh từ dữ liệu nhị phân
                         image = Image.open(io.BytesIO(response.content))
 
