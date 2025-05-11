@@ -1,49 +1,3 @@
-# from .utils import (read_data_from_pdf, get_text_chunks, get_embedding,
-#                     create_qdrant_collection, add_points_qdrant)
-# from rest_framework import status
-# import io
-# import os
-# from rest_framework.views import APIView
-# from rest_framework.response import Response
-# from rest_framework.permissions import AllowAny
-# import requests
-# import mimetypes
-
-# class ProcessDocumentView(APIView):
-#     permission_classes = [AllowAny]
-#     # def post(self, request):
-#     #     materials = request.data.get("materials", [])
-#     #     print('materials', materials)
-
-#     #     # all_pdf = [
-#     #     #         'documents/Hatang-TiengViet.pdf',
-#     #     #         'documents/Viet-Education2024.pdf',
-#     #     #         'documents/Viet-HitechPark2024.pdf',
-#     #     #         'documents/Viet-Logistics2024.pdf',
-#     #     #         'documents/Viet-Trade2024.pdf'
-#     #     #         ]
-        
-#     #     # for pdf_path in all_pdf:
-#     #     #     pdf_name = pdf_path.split('/')[-1].split('.')[0]
-
-#     #     #     try:
-#     #     #         print("Creating Collection for: ", pdf_name)
-#     #     #         create_qdrant_collection(pdf_name)
-#     #     #     except Exception as e:
-#     #     #         return Response({"message": str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-#     #     #     pdf_content = read_data_from_pdf(pdf_path)
-#     #     #     content_chunks = get_text_chunks(pdf_content)
-            
-#     #     #     print("Creating Embeddins for: ", pdf_name)
-#     #     #     embaddings_points = get_embedding(content_chunks)
-            
-#     #     #     print("Adding Embeddins for: ", pdf_name)
-#     #     #     add_points_qdrant(pdf_name, embaddings_points)
-                            
-#     #     return Response({"message": "Process documents successfully!"},
-#     #                      status=status.HTTP_200_OK)
-
 import io
 import os
 import requests
@@ -57,8 +11,15 @@ from docx import Document
 import zipfile
 import docx2txt 
 from PIL import Image
+import re
+import string
+import cv2
+import numpy as np
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract-OCR\tesseract.exe'
+from .utils import ( get_text_chunks, get_embedding, 
+                    create_qdrant_collection, add_points_qdrant)
+from rest_framework.exceptions import APIException, ValidationError
 
 class DocumentProcessingView(APIView):
     permission_classes=[AllowAny]
@@ -68,110 +29,106 @@ class DocumentProcessingView(APIView):
             material_type = material.get("materialType")
             data = material.get("data")
             name = material.get("name")
+            content = ''
 
             if material_type == "file":
                 file_id = data.split("d/")[-1].split("/")[0]
                 download_url = f"https://drive.google.com/uc?id={file_id}&export=download"
-                print(download_url)
                 response = requests.get(download_url)
                 
                 if response.status_code == 200:
-                    # File nhị phân hoặc không xác định: Content-Type: application/octet-stream
                     content_type = response.headers.get("Content-Type", "")
+                    ext = os.path.splitext(name or "")[1].lower()
 
-                    # Tách đường dẫn thành 2 phần, lấy phần mở rộng
-                    ext = os.path.splitext(name or "")[1].lower()  
-
-                    print(f"[INFO] Content-Type: {content_type}")
-                    print(f"[INFO] File Extension from name: {ext}")
-
-                    # Kiểm tra loại tệp và cố gắng đọc nội dung phù hợp
-                    # PDF
-                    if "pdf" in content_type or ext == ".pdf":
-                        try:
+                    try:
+                        if "pdf" in content_type or ext == ".pdf":
                             file_data = io.BytesIO(response.content)
                             reader = PdfReader(file_data)
-
-                            text_list = []
-                            for page in reader.pages:
-                                page_text = page.extract_text()
-                                if page_text:  # nếu trang có văn bản
-                                    text_list.append(page_text)
+                            text_list = [page.extract_text() for page in reader.pages if page.extract_text()]
                             text = "\n".join(text_list)
-                            
                             if text:
-                                print(f"[PDF Content] {text[:200]}...") 
+                                name = name.split('.')[0]
+                                content = text
                             else:
-                                print("[ERROR] Không thể trích xuất nội dung từ PDF.")
-                        except Exception as e:
-                            print(f"[ERROR] Lỗi khi xử lý PDF: {e}")
-                    # DOC
-                    elif "msword" in content_type or ext == ".doc":
-                        with open("temp.doc", "wb") as f:
-                            f.write(response.content)
-                        text = docx2txt.process("temp.doc")
-                        print(f"[DOC Content] {text[:200]}...")  # In 200 ký tự đầu
-                    # DOCX
-                    elif "officedocument.wordprocessingml.document" in content_type or ext == ".docx":
-                        try:
-                            file_data = io.BytesIO(response.content)
-                            
-                            # Sử dụng python-docx để đọc tệp DOCX
-                            doc = Document(file_data)
-                            text = []
-                            
-                            # Trích xuất văn bản từ các đoạn văn trong DOCX
-                            for para in doc.paragraphs:
-                                text.append(para.text)
-                            
-                            text = "\n".join(text)
-                            print(f"[DOCX Content] {text[:200]}...")  # In 200 ký tự đầu
-
-                        except Exception as e:
-                            print(f"[ERROR] Lỗi khi xử lý tệp DOCX: {e}")
-
-                    elif "excel" in content_type or ext in [".xls", ".xlsx", ".xlsm", ".csv"]:
-                        # Tạo file giả trong RAM
-                        file_data = io.BytesIO(response.content)
+                                raise APIException("Không thể trích xuất nội dung từ PDF.")
                         
-                        # Kiểm tra loại file và sử dụng engine phù hợp
-                        if ext in [".xlsx", ".xlsm"]: 
-                            df = pd.read_excel(file_data, engine='openpyxl')
-                        elif ext == ".xls": 
-                            df = pd.read_excel(file_data, engine='xlrd')
-                        elif ext == ".csv":
-                            df = pd.read_csv(file_data) 
+                        elif "msword" in content_type or ext == ".doc":
+                            with open("temp.doc", "wb") as f:
+                                f.write(response.content)
+                            content = docx2txt.process("temp.doc")
 
-                        # In 5 dòng đầu của DataFrame
-                        print(f"[Excel/CSV Content] {df.head()}")
+                        elif "officedocument.wordprocessingml.document" in content_type or ext == ".docx":
+                            file_data = io.BytesIO(response.content)
+                            doc = Document(file_data)
+                            content = "\n".join(para.text for para in doc.paragraphs)
 
-                    elif "image" in content_type or ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]:
-                        # Mở hình ảnh từ dữ liệu nhị phân
-                        image = Image.open(io.BytesIO(response.content))
+                        elif "excel" in content_type or ext in [".xls", ".xlsx", ".xlsm", ".csv"]:
+                            file_data = io.BytesIO(response.content)
+                            if ext in [".xlsx", ".xlsm"]:
+                                df = pd.read_excel(file_data, engine='openpyxl', dtype=str)
+                            elif ext == ".xls":
+                                df = pd.read_excel(file_data, engine='xlrd', dtype=str)
+                            elif ext == ".csv":
+                                df = pd.read_csv(file_data, dtype=str)
+                            content = df.to_string(index=False)
 
-                        # Hiển thị hình ảnh (nếu bạn muốn xem ảnh)
-                        # image.show()
+                        elif "image" in content_type or ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]:
+                            # Định nghĩa các ký tự cho phép
+                            allowed_chars = string.ascii_letters + string.digits + " "
 
-                        # Sử dụng pytesseract để trích xuất văn bản từ hình ảnh
-                        text = pytesseract.image_to_string(image)
+                            # Mở ảnh và tiền xử lý
+                            image = Image.open(io.BytesIO(response.content))
+                            custom_config = r'--psm 6 -c preserve_interword_spaces=1'
 
-                        # In ra văn bản đã trích xuất
-                        print(f"Văn bản trong ảnh: {text}")
+                            # Chuyển ảnh sang dạng xám
+                            gray_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2GRAY)
 
-                    else:
-                        print("[WARN] Không xác định được định dạng file hoặc chưa hỗ trợ đọc.")
+                            # Áp dụng ngưỡng (thresholding)
+                            _, thresholded_image = cv2.threshold(gray_image, 150, 255, cv2.THRESH_BINARY)
+
+                            # Tạo ảnh sau khi ngưỡng hóa
+                            processed_image = Image.fromarray(thresholded_image)
+
+                            # Nhận diện văn bản từ ảnh đã qua xử lý
+                            text = pytesseract.image_to_string(processed_image, config=custom_config)
+
+                            # Làm sạch văn bản: chỉ giữ lại các ký tự chữ, số và dấu cách
+                            cleaned_text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+
+                            # Gán lại nội dung
+                            content = cleaned_text
+
+                        else:
+                            raise ValidationError("Không xác định được định dạng file hoặc chưa hỗ trợ đọc.")
+
+                    except Exception as e:
+                        raise APIException(f"Lỗi khi xử lý file '{name}': {str(e)}")
 
                 else:
-                    print(f"[ERROR] Không thể tải file từ URL: {data} (Status: {response.status_code})")
+                    raise APIException(f"Không thể tải file từ URL: {data} (Status: {response.status_code})")
 
             elif material_type == "url":
                 try:
                     response = requests.get(data)
-                    print(f"[URL] {name} => {response.text[:200]}")  # In 200 ký tự đầu
+                    content = response.text
                 except Exception as e:
-                    print(f"[ERROR] Lỗi khi fetch URL {data}: {e}")
+                    raise APIException(f"Lỗi khi fetch URL {data}: {e}")
 
             elif material_type == "content":
-                print(f"[CONTENT] {name} => {data}")
+                content = data
+
+            else:
+                raise ValidationError(f"Loại tài liệu không được hỗ trợ: {material_type}")
+            
+            # Xử lí content nhận được của tất cả loại tài liệu
+            try:
+                collectionName = name + "_" + str(material['id'])
+                create_qdrant_collection(collectionName)
+                content_chunks = get_text_chunks(content)
+                embeddings_points = get_embedding(content_chunks, material)
+                add_points_qdrant(collectionName, embeddings_points)
+            except Exception as e:
+                print(f'Lỗi: {e}')
+                raise APIException(f"Lỗi khi lưu vào qdrant: {e}")
 
         return Response({"message": "Processed materials"}, status=200)
