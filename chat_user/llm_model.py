@@ -3,13 +3,13 @@ from django.conf import settings
 from langchain import OpenAI, ConversationChain
 from langchain.memory import ConversationBufferMemory
 from qdrant_client import QdrantClient
-import openai as open_ai
 from sentence_transformers import SentenceTransformer
 from google import genai
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
 import os
 from sklearn.metrics.pairwise import cosine_similarity
+import requests
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -90,6 +90,8 @@ def detect_top_stores_from_query(query, stores, top_k=3, min_similarity=0.5):
 
     return [store_name for store_name, _ in top_stores]
 
+import requests 
+
 def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
     # Tạo embedding bằng mô hình local
     query_embedding = model.encode(query).tolist()
@@ -100,11 +102,33 @@ def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
     # Kết nối với Qdrant client
     connection = QdrantClient("localhost", port=6333)
 
+    # Xử lí chat với loại tài liệu nào theo roleId
     filter = {}
     if roleId == 2:
-        filter = {"payload": {"accessLevelType": "public"}}
+        filter = {
+            "must": [
+                {
+                    "key": "accessLevelType",
+                    "match": {
+                        "value": "public"
+                    }
+                }
+            ]
+        }
+    elif roleId == 3:
+        filter = {
+            "must": [
+                {
+                    "key": "accessLevelType",
+                    "match": {
+                        "any": ["public", "internal"]
+                    }
+                }
+            ]
+        }
 
     search_results = []    
+    print('Related store to query', top_stores)
     # Lặp qua từng tên store trong top_stores
     for store_name in top_stores:
         try:
@@ -114,26 +138,35 @@ def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
             
             # Tìm kiếm trong từng collection của store
             for collection_name in collections:
-                result = connection.search(
-                    collection_name=collection_name, 
-                    query_vector=query_embedding,
-                    limit=3,
-                    filter=filter
+                # Gửi yêu cầu HTTP POST đến Qdrant
+                result = requests.post(
+                    f"http://localhost:6333/collections/{collection_name}/points/search",
+                    json={
+                        "vector": query_embedding,  # Vector tìm kiếm
+                        "filter": filter,  # Bộ lọc
+                        "limit": 3,  # Giới hạn số kết quả
+                        "with_payload": True,  # Lấy payload
+                        "with_vector": False  # Không lấy vector
+                    }
                 )
-                search_results.extend(result)
+                result_data = result.json()
+                for search_result in result_data.get('result', []):
+                    search_results.append(search_result)
 
         except Exception as e:
             print(f"Error searching in collection {store_name}: {e}")
 
     # Tạo prompt từ kết quả tìm kiếm
-    print('search result........', search_results)
     prompt = ""
     for search_result in search_results:
-        prompt += search_result.payload.get("text", "")
+        text = search_result.get("payload", {}).get("text", "")
+        prompt += text
 
     concatenated_string = f"""This is the previous data or context:\n{prompt}\n\nHere's the user query:\nQuestion: {query}"""
     
     return concatenated_string
+
+
 
 def get_llm(query, conver_id):
     memory = ConversationBufferMemory()
@@ -203,7 +236,6 @@ def get_llm_qdrant(conversationId, query, storeCollections, roleId):
     # Cập nhật prompt bằng cách thêm vào bộ nhớ
     # Lấy toàn bộ lịch sử hội thoại từ bộ nhớ
     conversation_history = memory.chat_memory.messages  # Lấy tất cả các tin nhắn trong bộ nhớ
-    print('Conversation_history:', conversation_history)
 
     # Tạo chuỗi prompt bao gồm lịch sử hội thoại và câu hỏi của người dùng
     full_prompt = "\n".join([msg.content for msg in conversation_history]) + "\n" + f"Question: {query}"
