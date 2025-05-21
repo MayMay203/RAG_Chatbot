@@ -47,7 +47,6 @@ class DocumentProcessingView(APIView):
                             text_list = [page.extract_text() for page in reader.pages if page.extract_text()]
                             text = "\n".join(text_list)
                             if text:
-                                name = name.split('.')[0]
                                 content = text
                             else:
                                 raise APIException("Không thể trích xuất nội dung từ PDF.")

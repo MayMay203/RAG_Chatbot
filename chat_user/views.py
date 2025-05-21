@@ -21,10 +21,10 @@ class MessageView(APIView):
             decoded_token = jwt.decode(accessToken, SECRET_KEY, algorithms=["HS256"])
             roleId = decoded_token['roleId']
 
-            # response = get_llm_qdrant(conversationId, query, storeCollections, filter, roleId)
+            response = get_llm_qdrant(conversationId, query, storeCollections, roleId)
 
             return Response(
-                'jojo',
+                response,
                 status=status.HTTP_200_OK
             )
         except Exception as e:
