@@ -1,7 +1,7 @@
 # chat_user/urls.py
 from django.urls import path
-from . import views
+from .views import *
 
 urlpatterns = [
-    # Thêm các URL patterns ở đây
+    path('send-message', MessageView.as_view(), name='messages'),
 ]
