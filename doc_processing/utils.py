@@ -4,13 +4,17 @@ from qdrant_client import QdrantClient,models
 from qdrant_client.http.models import PointStruct
 from sentence_transformers import SentenceTransformer
 import uuid
-
+import os
+import google.generativeai as genai
+import asyncio
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 import time
 
-def unique_collection_name(name):
-    timestamp = int(time.time() * 1000)  
-    safe_name = name.replace(" ", "_") 
-    return f"{safe_name}_{timestamp}"
+# def unique_collection_name(name):
+#     timestamp = int(time.time() * 1000)  
+#     safe_name = name.replace(" ", "_") 
+#     return f"{safe_name}_{timestamp}"
 
 def get_text_chunks(text):
   text_splitter = CharacterTextSplitter(
@@ -25,6 +29,7 @@ def get_text_chunks(text):
 # Custom
 # Load model local -> chuyển text thành vector 384 chiều
 model = SentenceTransformer('all-MiniLM-L6-v2')
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 def get_embedding(text_chunks, material):
     points = []
     embeddings = model.encode(text_chunks)  # Nhận list các vector embedding
@@ -40,7 +45,7 @@ def get_embedding(text_chunks, material):
               "materialName": material.get('name') or material.get('url'),
               "materialType": material.get('materialType') or 'url',
               "accessType": material.get('accessType') or 'public',
-              # "knowledgeStore": material['knowledgeStore']
+              "knowledgeStore": material['knowledgeStore']
             }
         ))
 
@@ -64,3 +69,21 @@ def add_points_qdrant(collection_name, points):
     connection.upsert(collection_name=collection_name, points=points)
     
     return True
+
+# Hàm: Crawl nội dung từ URL
+async def fetch_url_content(url: str) -> str:
+    browser_config = BrowserConfig()
+    run_config = CrawlerRunConfig()
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun(url=url, config=run_config)
+        if result.success and result.markdown:
+            return result.markdown.raw_markdown
+        else:
+            raise Exception(f"Không thể crawl URL: {result.status_code} - {result.error_message}")
+
+# Hàm: Gửi prompt tới Gemini và nhận kết quả
+def gemini_generate_content(prompt: str) -> str:
+    genai.configure(api_key=gemini_api_key) 
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
+    response = model.generate_content(prompt)
+    return response.text

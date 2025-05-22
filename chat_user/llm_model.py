@@ -5,6 +5,7 @@ from langchain.memory import ConversationBufferMemory
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from google import genai
+import google.generativeai as genaiModel
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
 import os
@@ -249,3 +250,29 @@ def get_llm_qdrant(conversationId, query, storeCollections, roleId):
     
     # Trả về kết quả từ Gemini API
     return response.text
+
+genaiModel.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genaiModel.GenerativeModel("gemini-2.0-flash")
+
+def detect_has_context_with_gemini(user_input: str) -> bool:
+    prompt = f"""
+        Xác định xem người dùng có đang cung cấp một đoạn nội dung có ngữ cảnh (context) để hỏi về nó hay không.
+
+        Nếu có, trả lời: "True"  
+        Nếu không, trả lời: "False"  
+
+        Input: \"\"\"{user_input}\"\"\"
+        """
+    response = model.generate_content(prompt)
+    return "True" in response.text
+
+def ask_gemini_with_context(user_input: str) -> str:
+    prompt = f"""
+        Dưới đây là nội dung người dùng cung cấp. Hãy đọc kỹ và trả lời dựa trên nội dung này:
+
+        \"\"\"{user_input}\"\"\"
+
+        Hãy trả lời một cách rõ ràng và chính xác.
+        """
+    response = model.generate_content(prompt)
+    return response.text.strip()

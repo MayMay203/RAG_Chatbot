@@ -2,7 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from .llm_model import (get_llm_qdrant)
+from .llm_model import (get_llm_qdrant, detect_has_context_with_gemini, ask_gemini_with_context)
+from .utils import (contains_url)
 import jwt
 import os
 
@@ -15,6 +16,18 @@ class MessageView(APIView):
             conversationId =  request.data.get('conversationId')
             query = request.data.get("query")
             storeCollections = request.data.get('materialsByStore')
+            isHasContext = detect_has_context_with_gemini(query)
+            if isHasContext:
+                if contains_url(query):
+                    print("Context with URL")
+                    return Response({"type": "context_with_url"})
+                else:
+                    gemini_answer = ask_gemini_with_context(query)
+                    return Response(
+                        gemini_answer,
+                        status=status.HTTP_200_OK
+                    )
+                    
             accessToken = request.data.get('accessToken')
 
             SECRET_KEY = os.getenv("JWT_ACCESS_SECRET")
