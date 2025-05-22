@@ -18,7 +18,7 @@ import numpy as np
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract-OCR\tesseract.exe'
 from .utils import ( get_text_chunks, get_embedding, 
-                    create_qdrant_collection, add_points_qdrant)
+                    create_qdrant_collection, add_points_qdrant, unique_collection_name)
 from rest_framework.exceptions import APIException, ValidationError
 
 class DocumentProcessingView(APIView):
@@ -118,7 +118,7 @@ class DocumentProcessingView(APIView):
             
             # Xử lí content nhận được của tất cả loại tài liệu
             try:
-                collectionName = name + "_" + str(material['id'])
+                collectionName = unique_collection_name(name)
                 create_qdrant_collection(collectionName)
                 content_chunks = get_text_chunks(content)
                 embeddings_points = get_embedding(content_chunks, material)
@@ -128,3 +128,5 @@ class DocumentProcessingView(APIView):
                 raise APIException(f"Lỗi khi lưu vào qdrant: {e}")
 
         return Response({"message": "Processed materials"}, status=200)
+    
+
