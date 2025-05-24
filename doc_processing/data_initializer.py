@@ -11,7 +11,7 @@ def collection_is_empty():
         collections = client.get_collections().collections
         return len(collections) == 0
     except Exception as e:
-        print("Không thể kiểm tra collection:", e)
+        print("Cannot check collection:", e)
         return True 
     
 def url_to_collection_name(url):
@@ -21,7 +21,7 @@ def url_to_collection_name(url):
 
 def build_data_once():
     if collection_is_empty():
-        print("Qdrant trống. Đang build dữ liệu từ output.json...")
+        print("Qdrant is empty. Building data from output.json...")
 
         with open("data/output.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -35,8 +35,8 @@ def build_data_once():
                 add_points_qdrant(collection_name, embeddings_points)
             except Exception as e:
                 print(f'Lỗi: {e}')
-                raise Exception(f"Lỗi khi lưu vào qdrant: {e}")
+                raise Exception(f"Error when saving into qdrant: {e}")
 
-        print("Build dữ liệu hoàn tất.")
+        print("Build data successfully!.")
     else:
-        print("Qdrant đã có dữ liệu, không build lại.")
+        print("Qdrant already has data; skipping rebuild.")

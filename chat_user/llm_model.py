@@ -1,5 +1,4 @@
 # from chat.models import Message
-from django.conf import settings
 from langchain import OpenAI, ConversationChain
 from langchain.memory import ConversationBufferMemory
 from qdrant_client import QdrantClient
@@ -13,7 +12,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import requests
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
-
+genaiModel.configure(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_model = genaiModel.GenerativeModel("gemini-2.0-flash")
 
 # def get_final_prompt(query):
 #     # Get Embeddings
@@ -61,8 +61,6 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Custom
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
 # Encode label 1 lần duy nhất
 def get_embedding_store(stores):
     for store in stores:
@@ -90,8 +88,6 @@ def detect_top_stores_from_query(query, stores, top_k=3, min_similarity=0.5):
     top_stores = filtered[:top_k]
 
     return [store_name for store_name, _ in top_stores]
-
-import requests 
 
 def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
     # Tạo embedding bằng mô hình local
@@ -135,8 +131,21 @@ def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
         try:
             # Lấy danh sách collection (tên tài liệu) liên quan đến store
             store = next((store for store in stores if store["storeName"] == store_name), None)
-            collections = store['materials']
-            
+            store_collections = store['materials']
+
+            # 2. Lấy tất cả collections từ Qdrant
+            qdrant_collections_response = requests.get("http://localhost:6333/collections")
+            qdrant_collections_data = qdrant_collections_response.json()
+
+            # 3. Lọc các collection có tên bắt đầu bằng 'collection_'
+            qdrant_collections = [
+                collection['name'] for collection in qdrant_collections_data.get('result', {}).get('collections', [])
+                if collection['name'].startswith("collection_")
+            ]
+
+            # 4. Gộp và loại bỏ trùng lặp
+            collections = list(set(store_collections + qdrant_collections))
+            print(collections)
             # Tìm kiếm trong từng collection của store
             for collection_name in collections:
                 # Gửi yêu cầu HTTP POST đến Qdrant
@@ -151,6 +160,7 @@ def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
                     }
                 )
                 result_data = result.json()
+                print('result_data', result_data)
                 for search_result in result_data.get('result', []):
                     search_results.append(search_result)
 
@@ -239,7 +249,8 @@ def get_llm_qdrant(conversationId, query, storeCollections, roleId):
     conversation_history = memory.chat_memory.messages  # Lấy tất cả các tin nhắn trong bộ nhớ
 
     # Tạo chuỗi prompt bao gồm lịch sử hội thoại và câu hỏi của người dùng
-    full_prompt = "\n".join([msg.content for msg in conversation_history]) + "\n" + f"Question: {query}"
+    full_prompt = "\n".join([msg.content for msg in conversation_history])
+    # full_prompt = "\n".join([msg.content for msg in conversation_history]) + "\n" + f"Question: {query}"
     print('Full_promt: ', full_prompt)
 
     # Gửi yêu cầu tới Gemini API để tạo nội dung với bộ nhớ
@@ -251,9 +262,6 @@ def get_llm_qdrant(conversationId, query, storeCollections, roleId):
     # Trả về kết quả từ Gemini API
     return response.text
 
-genaiModel.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genaiModel.GenerativeModel("gemini-2.0-flash")
-
 def detect_has_context_with_gemini(user_input: str) -> bool:
     prompt = f"""
         Xác định xem người dùng có đang cung cấp một đoạn nội dung có ngữ cảnh (context) để hỏi về nó hay không.
@@ -263,7 +271,7 @@ def detect_has_context_with_gemini(user_input: str) -> bool:
 
         Input: \"\"\"{user_input}\"\"\"
         """
-    response = model.generate_content(prompt)
+    response = gemini_model.generate_content(prompt)
     return "True" in response.text
 
 def ask_gemini_with_context(user_input: str) -> str:
@@ -274,5 +282,5 @@ def ask_gemini_with_context(user_input: str) -> str:
 
         Hãy trả lời một cách rõ ràng và chính xác.
         """
-    response = model.generate_content(prompt)
+    response = gemini_model.generate_content(prompt)
     return response.text.strip()

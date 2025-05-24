@@ -6,22 +6,17 @@ def contains_url(text: str) -> bool:
     url_pattern = r'https?://\S+|www\.\S+'
     return re.search(url_pattern, text) is not None
 
-def extract_first_url(text: str) -> str:
-    match = re.search(r'https?://\S+', text)
-    if not match:
-        return ""
-    url = match.group(0)
+def extract_all_urls(text: str) -> list[str]:
+    matches = re.findall(r'https?://\S+', text)
+    # Loại bỏ ký tự thừa ở cuối mỗi URL nếu có
+    cleaned_urls = [url.rstrip('.,;:)[]{}\'"<>') for url in matches]
+    return cleaned_urls
 
-    # Loại bỏ ký tự thừa ở cuối (nếu có)
-    url = url.rstrip('.,;:)[]{}\'"<>')
-    
-    return url
-
-def classify_url_type(url: str) -> str:
+def classify_url_type(url: str, fileTypes) -> str:
     parsed = urlparse(url.lower())
     path = parsed.path
 
-    if path.endswith((".pdf", ".docx", ".doc", ".pptx", ".xlsx")):
+    if path.endswith((".pdf", ".docx", ".doc", ".pptx", ".xlsx")) or len(fileTypes) > 0:
         return "document"
     else:
         return "website"

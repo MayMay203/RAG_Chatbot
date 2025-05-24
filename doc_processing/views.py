@@ -5,14 +5,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from PyPDF2 import PdfReader
 from rest_framework.permissions import AllowAny
-import mimetypes
 import pandas as pd
 from docx import Document
-import zipfile
 import docx2txt 
 from PIL import Image
 import re
-import string
 import cv2
 import numpy as np
 import pytesseract
@@ -22,7 +19,6 @@ from .utils import ( get_text_chunks, get_embedding,
 from rest_framework.exceptions import APIException, ValidationError
 from qdrant_client import QdrantClient
 import asyncio
-import google.generativeai as genai 
 
 qdrant_client = QdrantClient("localhost", port=6333)
 class DocumentProcessingView(APIView):
