@@ -129,7 +129,7 @@ class MessageView(APIView):
             decoded_token = jwt.decode(accessToken, SECRET_KEY, algorithms=["HS256"])
             roleId = decoded_token['roleId']
 
-            response = get_llm_qdrant(conversationId, query, storeCollections, roleId)
+            response = get_llm_qdrant(conversationId, query, roleId)
 
             return Response(
                 response,
