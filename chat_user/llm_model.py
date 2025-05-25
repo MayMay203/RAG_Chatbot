@@ -189,7 +189,6 @@ def get_final_prompt(query, roleId):
             col['name']
             for col in collections_data.get("result", {}).get("collections", [])
         ]
-        print(collections)
     except Exception as e:
         print(f"Error to get collections list: {e}")
         return "Cannot access Qdrant."

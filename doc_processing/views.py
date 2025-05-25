@@ -67,7 +67,8 @@ class DocumentProcessingView(APIView):
                             file_data = io.BytesIO(response.content)
                             doc = Document(file_data)
                             content = "\n".join(para.text for para in doc.paragraphs)
-
+                        elif "text/plain" in content_type or ext == ".txt":
+                            content = response.content.decode("utf-8", errors="ignore")
                         elif "excel" in content_type or ext in [".xls", ".xlsx", ".xlsm", ".csv"]:
                             file_data = io.BytesIO(response.content)
                             if ext in [".xlsx", ".xlsm"]:
