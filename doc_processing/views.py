@@ -5,22 +5,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from PyPDF2 import PdfReader
 from rest_framework.permissions import AllowAny
-import mimetypes
 import pandas as pd
 from docx import Document
-import zipfile
 import docx2txt 
 from PIL import Image
 import re
-import string
 import cv2
 import numpy as np
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract-OCR\tesseract.exe'
 from .utils import ( get_text_chunks, get_embedding, 
-                    create_qdrant_collection, add_points_qdrant, unique_collection_name)
+                    create_qdrant_collection, add_points_qdrant, fetch_url_content, gemini_generate_content)
 from rest_framework.exceptions import APIException, ValidationError
+from qdrant_client import QdrantClient
+import asyncio
 
+qdrant_client = QdrantClient("localhost", port=6333)
 class DocumentProcessingView(APIView):
     permission_classes=[AllowAny]
     def post(self, request):
@@ -29,6 +29,13 @@ class DocumentProcessingView(APIView):
             material_type = material.get("materialType")
             data = material.get("data")
             name = material.get("name")
+            collectionName = name + "_" + str(material['id'])
+            existing_collections = [c.name for c in qdrant_client.get_collections().collections]
+
+            if collectionName in existing_collections:
+                print(f"Bỏ qua: Collection '{collectionName}' đã tồn tại.")
+                continue
+
             content = ''
 
             if material_type == "file":
@@ -60,7 +67,8 @@ class DocumentProcessingView(APIView):
                             file_data = io.BytesIO(response.content)
                             doc = Document(file_data)
                             content = "\n".join(para.text for para in doc.paragraphs)
-
+                        elif "text/plain" in content_type or ext == ".txt":
+                            content = response.content.decode("utf-8", errors="ignore")
                         elif "excel" in content_type or ext in [".xls", ".xlsx", ".xlsm", ".csv"]:
                             file_data = io.BytesIO(response.content)
                             if ext in [".xlsx", ".xlsm"]:
@@ -105,9 +113,12 @@ class DocumentProcessingView(APIView):
 
             elif material_type == "url":
                 try:
-                    response = requests.get(data)
-                    content = response.text
+                    raw_content = asyncio.run(fetch_url_content(data))
+                    prompt = f'Bạn hãy đọc đoạn văn bản dưới đây và tóm tắt lại nội dung chính, chỉ lấy phần văn bản chính, bỏ qua tất cả các link, địa chỉ URL, hình ảnh, biểu tượng, quảng cáo, các phần điều hướng hoặc nội dung không liên quan khác. Chỉ trả về phần nội dung văn bản thuần túy. Nội dung phải đầy đủ các đoạn văn bản. Đoạn văn bản: "{raw_content}"'
+
+                    content = gemini_generate_content(prompt)
                 except Exception as e:
+                    print(e)
                     raise APIException(f"Lỗi khi fetch URL {data}: {e}")
 
             elif material_type == "content":
@@ -118,7 +129,6 @@ class DocumentProcessingView(APIView):
             
             # Xử lí content nhận được của tất cả loại tài liệu
             try:
-                collectionName = unique_collection_name(name)
                 create_qdrant_collection(collectionName)
                 content_chunks = get_text_chunks(content)
                 embeddings_points = get_embedding(content_chunks, material)
