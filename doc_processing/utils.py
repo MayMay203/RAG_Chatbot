@@ -33,6 +33,11 @@ gemini_api_key = os.getenv("GEMINI_API_KEY")
 def get_embedding(text_chunks, material):
     points = []
     embeddings = model.encode(text_chunks)  # Nhận list các vector embedding
+    typeMap = {
+        1: 'file',
+        2: 'content',
+        3: 'url',
+    }
 
     #  Mỗi chunk ứng với enbedding tương ứng
     for chunk, emb in zip(text_chunks, embeddings):
@@ -41,11 +46,10 @@ def get_embedding(text_chunks, material):
             vector=emb.tolist(),  # Chuyển về list nếu cần lưu
             payload={
               "text": chunk,
-              # "materialId": material['id'],
               "materialName": material.get('name') or material.get('url'),
-              "materialType": material.get('materialType') or 'url',
+              "materialType": typeMap[material.get('materialType').get('id')],
               "accessType": material.get('accessType') or 'public',
-              "knowledgeStore": material['knowledgeStore']
+              "active": True
             }
         ))
 

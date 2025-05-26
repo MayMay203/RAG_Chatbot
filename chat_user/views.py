@@ -34,7 +34,6 @@ class MessageView(APIView):
         try:
             conversationId =  request.data.get('conversationId')
             query = request.data.get("query")
-            storeCollections = request.data.get('materialsByStore')
             fileTypes = request.data.get('fileTypes')
             nameList = request.data.get('nameList')
             isHasContext = detect_has_context_with_gemini(query)
