@@ -201,13 +201,21 @@ def get_final_prompt(query, roleId):
     if roleId == 2:
         filter = {
             "must": [
-                {"key": "accessType", "match": {"value": "public"}}
+                {"key": "accessType", "match": {"value": "public"}},
+                {"key": "active", "match": {"value": True}}
             ]
         }
     elif roleId == 3:
         filter = {
             "must": [
-                {"key": "accessType", "match": {"any": ["public", "internal"]}}
+                {"key": "accessType", "match": {"any": ["public", "internal"]}},
+                {"key": "active", "match": {"value": True}}
+            ]
+        }
+    else:
+        filter = {
+            "must": [
+                {"key": "active", "match": {"value": True}}
             ]
         }
 

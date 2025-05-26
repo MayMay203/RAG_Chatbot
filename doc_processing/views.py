@@ -26,19 +26,19 @@ class DocumentProcessingView(APIView):
     def post(self, request):
         materials = request.data.get("materials", [])
         for material in materials:
-            material_type = material.get("materialType")
-            data = material.get("data")
+            material_type_id = material.get("materialType").get("id")
             name = material.get("name")
             collectionName = name + "_" + str(material['id'])
             existing_collections = [c.name for c in qdrant_client.get_collections().collections]
 
             if collectionName in existing_collections:
-                print(f"Bỏ qua: Collection '{collectionName}' đã tồn tại.")
+                print(f"Skip this collection: '{collectionName}' existed.")
                 continue
 
             content = ''
 
-            if material_type == "file":
+            if material_type_id == 1: #type file
+                data = material.get('url')
                 file_id = data.split("d/")[-1].split("/")[0]
                 download_url = f"https://drive.google.com/uc?id={file_id}&export=download"
                 response = requests.get(download_url)
@@ -56,7 +56,7 @@ class DocumentProcessingView(APIView):
                             if text:
                                 content = text
                             else:
-                                raise APIException("Không thể trích xuất nội dung từ PDF.")
+                                raise APIException("Can not extract content from PDF.")
                         
                         elif "msword" in content_type or ext == ".doc":
                             with open("temp.doc", "wb") as f:
@@ -103,31 +103,32 @@ class DocumentProcessingView(APIView):
                             content = cleaned_text
 
                         else:
-                            raise ValidationError("Không xác định được định dạng file hoặc chưa hỗ trợ đọc.")
+                            raise ValidationError("File format is not determined or not supported.")
 
                     except Exception as e:
-                        raise APIException(f"Lỗi khi xử lý file '{name}': {str(e)}")
+                        raise APIException(f"Error when handling file '{name}': {str(e)}")
 
                 else:
-                    raise APIException(f"Không thể tải file từ URL: {data} (Status: {response.status_code})")
+                    raise APIException(f"Cannot download file from this: {data} (Status: {response.status_code})")
 
-            elif material_type == "url":
+            elif material_type_id == 3:   # type url
                 try:
+                    data = material.get('url')
                     raw_content = asyncio.run(fetch_url_content(data))
                     prompt = f'Bạn hãy đọc đoạn văn bản dưới đây và tóm tắt lại nội dung chính, chỉ lấy phần văn bản chính, bỏ qua tất cả các link, địa chỉ URL, hình ảnh, biểu tượng, quảng cáo, các phần điều hướng hoặc nội dung không liên quan khác. Chỉ trả về phần nội dung văn bản thuần túy. Nội dung phải đầy đủ các đoạn văn bản. Đoạn văn bản: "{raw_content}"'
 
                     content = gemini_generate_content(prompt)
                 except Exception as e:
                     print(e)
-                    raise APIException(f"Lỗi khi fetch URL {data}: {e}")
+                    raise APIException(f"Error when fetch URL {data}: {e}")
 
-            elif material_type == "content":
-                content = data
+            elif material_type_id == 2: # type content
+                content = material.get('text')
 
             else:
-                raise ValidationError(f"Loại tài liệu không được hỗ trợ: {material_type}")
+                raise APIException(f"The type of document is not supported")
             
-            # Xử lí content nhận được của tất cả loại tài liệu
+            # Xử lí content nhận được của các loại tài liệu
             try:
                 create_qdrant_collection(collectionName)
                 content_chunks = get_text_chunks(content)
@@ -135,8 +136,64 @@ class DocumentProcessingView(APIView):
                 add_points_qdrant(collectionName, embeddings_points)
             except Exception as e:
                 print(f'Lỗi: {e}')
-                raise APIException(f"Lỗi khi lưu vào qdrant: {e}")
+                raise APIException(f"Error when saved to QDRant: {e}")
 
         return Response({"message": "Processed materials"}, status=200)
     
+class MaterialActivationView(APIView):
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        materials = request.data.get("materials") 
+        
+        if not materials or not isinstance(materials, list):
+            raise APIException("Missing or invalid 'materials' list")
+
+        results = []
+
+        for mat in materials:
+            material_id = mat.get("material_id")
+            material_name = mat.get("material_name")
+            new_status = mat.get("new_status")
+
+            if material_id is None or material_name is None or new_status is None:
+                results.append({
+                    "material_id": material_id,
+                    "material_name": material_name,
+                    "error": "Missing material_id, material_name, or new_status"
+                })
+                continue
+
+            collection_name = f"{material_name}_{material_id}"
+            try:
+                scroll_result = qdrant_client.scroll(
+                    collection_name=collection_name,
+                    with_payload=True,
+                    limit=10000,
+                )
+                point_ids = [point.id for point in scroll_result[0]]
+                if not point_ids:
+                    results.append({
+                        "material_id": material_id,
+                        "material_name": material_name,
+                        "error": "No vectors found in collection"
+                    })
+                    continue
+
+                qdrant_client.set_payload(
+                    collection_name=collection_name,
+                    payload={"active": new_status},
+                    points=point_ids
+                )
+
+                results.append({
+                    "material_id": material_id,
+                    "material_name": material_name,
+                    "updated_vectors": len(point_ids),
+                    "new_status": new_status
+                })
+
+            except Exception as e:
+                raise APIException(f"Failed to toggle status for material: {e}")
+
+        return Response({"results": results}, status=200)
