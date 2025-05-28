@@ -39,6 +39,9 @@ def get_embedding(text_chunks, material):
         3: 'url',
     }
 
+    material_type_id = material.get('materialType', {}).get('id')
+    material_name = material.get('url') if material_type_id == 3 else material.get('name')
+
     #  Mỗi chunk ứng với enbedding tương ứng
     for chunk, emb in zip(text_chunks, embeddings):
         points.append(PointStruct(
@@ -46,7 +49,7 @@ def get_embedding(text_chunks, material):
             vector=emb.tolist(),  # Chuyển về list nếu cần lưu
             payload={
               "text": chunk,
-              "materialName": material.get('name') or material.get('url'),
+              "materialName": material_name,
               "materialType": typeMap[material.get('materialType').get('id')],
               "accessType": material.get('accessType') or 'public',
               "active": True

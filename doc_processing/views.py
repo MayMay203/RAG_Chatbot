@@ -21,6 +21,23 @@ from qdrant_client import QdrantClient
 import asyncio
 
 qdrant_client = QdrantClient("localhost", port=6333)
+
+class DocumentDeleteActionView(APIView):
+    permission_classes = [AllowAny]
+    def delete(self, request):
+        collection_name = request.data.get('collection_name')
+
+        if not collection_name:
+            raise APIException(f"Collection_name is required!")
+
+        client = QdrantClient(host="localhost", port=6333)
+
+        try:
+            client.delete_collection(collection_name=collection_name)
+            return Response({'message': f'Collection "{collection_name}" deleted successfully'}, status=200)
+        except Exception as e:
+            raise APIException(f"Delete collection not successfully")
+        
 class DocumentProcessingView(APIView):
     permission_classes=[AllowAny]
     def post(self, request):
@@ -140,9 +157,10 @@ class DocumentProcessingView(APIView):
 
         return Response({"message": "Processed materials"}, status=200)
     
-class MaterialActivationView(APIView):
+class DocumentActivationView(APIView):
     permission_classes = [AllowAny]
 
+    # toggle active material
     def post(self, request):
         materials = request.data.get("materials") 
         

@@ -18,8 +18,6 @@ Including another URLconf
 from django.urls import path, include
 
 urlpatterns = [
-    # path('admin/', admin.site.urls),
-    # chatapp urls
     path('conversations/', include('chat_user.urls')),
-    path('documnents/', include('doc_processing.urls')),
+    path('documents/', include('doc_processing.urls')),
 ]
