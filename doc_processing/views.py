@@ -42,6 +42,7 @@ class DocumentProcessingView(APIView):
     permission_classes=[AllowAny]
     def post(self, request):
         materials = request.data.get("materials", [])
+        print(materials)
         for material in materials:
             material_type_id = material.get("materialType").get("id")
             name = material.get("name")
