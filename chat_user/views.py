@@ -109,7 +109,8 @@ class MessageView(APIView):
                                 raw_content = asyncio.run(fetch_url_content(url))
                                 prompt = f'Bạn hãy đọc đoạn văn bản dưới đây và tóm tắt lại nội dung chính, chỉ lấy phần văn bản chính, bỏ qua tất cả các link, địa chỉ URL, hình ảnh, biểu tượng, quảng cáo, các phần điều hướng hoặc nội dung không liên quan khác. Chỉ trả về phần nội dung văn bản thuần túy. Nội dung phải đầy đủ các đoạn văn bản. Đoạn văn bản: "{raw_content}"'
                                 content = gemini_generate_content(prompt)
-                                prompt_2 = f"""
+                                if int(roleId) != 1:
+                                    prompt_2 = f"""
                                     Từ nội dung văn bản sau, hãy giúp tôi:
                                     1. Đặt một tiêu đề ngắn gọn, súc tích (name) phản ánh đúng nội dung chính của tài liệu. Tiêu đề không quá 255 ký tự.
                                     2. Viết một đoạn mô tả ngắn (description) giới thiệu tài liệu, độ dài khoảng 1–2 câu. Tiêu đề không quá 255 ký tự.
@@ -118,26 +119,26 @@ class MessageView(APIView):
                                     \"\"\"{content}\"\"\"
                                     Trả về kết quả dưới dạng JSON với các khóa: name, description.
                                     """
-                                result_json = gemini_generate_content(prompt_2)
+                                    result_json = gemini_generate_content(prompt_2)
 
-                                def clean_json_response(response_str):
-                                    return re.sub(r"^```(?:json)?\s*|\s*```$", "", response_str.strip(), flags=re.MULTILINE)
-                                
-                                cleaned_json = clean_json_response(result_json)
-                                result = json.loads(cleaned_json)
+                                    def clean_json_response(response_str):
+                                        return re.sub(r"^```(?:json)?\s*|\s*```$", "", response_str.strip(), flags=re.MULTILINE)
+                                    
+                                    cleaned_json = clean_json_response(result_json)
+                                    result = json.loads(cleaned_json)
 
-                                # handle save into db
-                                material_data = {
-                                    "name": result['name'],
-                                    "description": result['description'],
-                                    "url": url,
-                                    "createdAt": datetime.now(timezone.utc).isoformat(),
-                                    "updatedAt": datetime.now(timezone.utc).isoformat(),
-                                    "materialType": {"id": 3},
-                                    "accessLevel": {"id": 1},
-                                    "account": {"id": accountId}
-                                }
-                                send_material_request(material_data, accessToken)
+                                    # handle save into db
+                                    material_data = {
+                                        "name": result['name'],
+                                        "description": result['description'],
+                                        "url": url,
+                                        "createdAt": datetime.now(timezone.utc).isoformat(),
+                                        "updatedAt": datetime.now(timezone.utc).isoformat(),
+                                        "materialType": {"id": 3},
+                                        "accessLevel": {"id": 1},
+                                        "account": {"id": accountId}
+                                    }
+                                    send_material_request(material_data, accessToken)
                             except Exception as e:
                                 print(e)
                                 continue  # skip this URL and move on
