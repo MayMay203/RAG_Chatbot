@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from .llm_model import (get_llm_qdrant, detect_has_context_with_gemini, ask_gemini_with_context)
-from .utils import (contains_url, extract_all_urls, classify_url_type)
+from .utils import (contains_url, extract_all_urls, classify_url_type, send_material_request)
 import jwt
 import os
 import io
@@ -24,9 +24,8 @@ pytesseract.pytesseract.tesseract_cmd = r'D:\Tesseract-OCR\tesseract.exe'
 from rest_framework.exceptions import APIException
 import asyncio
 from doc_processing.utils import fetch_url_content, gemini_generate_content
-
-
-
+from datetime import datetime, timezone
+import json
 class MessageView(APIView):
     permission_classes = [AllowAny]
 
@@ -36,6 +35,13 @@ class MessageView(APIView):
             query = request.data.get("query")
             fileTypes = request.data.get('fileTypes')
             nameList = request.data.get('nameList')
+
+            accessToken = request.data.get('accessToken')
+            SECRET_KEY = os.getenv("JWT_ACCESS_SECRET")
+            decoded_token = jwt.decode(accessToken, SECRET_KEY, algorithms=["HS256"])
+            roleId = decoded_token['roleId']
+            accountId = decoded_token['id']
+
             isHasContext = detect_has_context_with_gemini(query)
             # Case: query has context
             if isHasContext:
@@ -95,6 +101,7 @@ class MessageView(APIView):
                                 processed_image = Image.fromarray(thresholded_image)
                                 text = pytesseract.image_to_string(processed_image, config='--psm 6 -c preserve_interword_spaces=1')
                                 content = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+                            # handle save into db
 
                         # URL Website
                         else:
@@ -102,6 +109,35 @@ class MessageView(APIView):
                                 raw_content = asyncio.run(fetch_url_content(url))
                                 prompt = f'Bạn hãy đọc đoạn văn bản dưới đây và tóm tắt lại nội dung chính, chỉ lấy phần văn bản chính, bỏ qua tất cả các link, địa chỉ URL, hình ảnh, biểu tượng, quảng cáo, các phần điều hướng hoặc nội dung không liên quan khác. Chỉ trả về phần nội dung văn bản thuần túy. Nội dung phải đầy đủ các đoạn văn bản. Đoạn văn bản: "{raw_content}"'
                                 content = gemini_generate_content(prompt)
+                                prompt_2 = f"""
+                                    Từ nội dung văn bản sau, hãy giúp tôi:
+                                    1. Đặt một tiêu đề ngắn gọn, súc tích (name) phản ánh đúng nội dung chính của tài liệu. Tiêu đề không quá 255 ký tự.
+                                    2. Viết một đoạn mô tả ngắn (description) giới thiệu tài liệu, độ dài khoảng 1–2 câu. Tiêu đề không quá 255 ký tự.
+
+                                    Nội dung tài liệu:
+                                    \"\"\"{content}\"\"\"
+                                    Trả về kết quả dưới dạng JSON với các khóa: name, description.
+                                    """
+                                result_json = gemini_generate_content(prompt_2)
+
+                                def clean_json_response(response_str):
+                                    return re.sub(r"^```(?:json)?\s*|\s*```$", "", response_str.strip(), flags=re.MULTILINE)
+                                
+                                cleaned_json = clean_json_response(result_json)
+                                result = json.loads(cleaned_json)
+
+                                # handle save into db
+                                material_data = {
+                                    "name": result['name'],
+                                    "description": result['description'],
+                                    "url": url,
+                                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                                    "updatedAt": datetime.now(timezone.utc).isoformat(),
+                                    "materialType": {"id": 3},
+                                    "accessLevel": {"id": 1},
+                                    "account": {"id": accountId}
+                                }
+                                send_material_request(material_data, accessToken)
                             except Exception as e:
                                 print(e)
                                 continue  # skip this URL and move on
@@ -122,11 +158,6 @@ class MessageView(APIView):
 
             # The query has no context
             print('Question has no context')
-            accessToken = request.data.get('accessToken')
-
-            SECRET_KEY = os.getenv("JWT_ACCESS_SECRET")
-            decoded_token = jwt.decode(accessToken, SECRET_KEY, algorithms=["HS256"])
-            roleId = decoded_token['roleId']
 
             response = get_llm_qdrant(conversationId, query, roleId)
 
