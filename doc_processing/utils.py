@@ -6,15 +6,8 @@ from sentence_transformers import SentenceTransformer
 import uuid
 import os
 import google.generativeai as genai
-import asyncio
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
-import time
-
-# def unique_collection_name(name):
-#     timestamp = int(time.time() * 1000)  
-#     safe_name = name.replace(" ", "_") 
-#     return f"{safe_name}_{timestamp}"
 
 def get_text_chunks(text):
   text_splitter = CharacterTextSplitter(
@@ -60,13 +53,14 @@ def get_embedding(text_chunks, material):
 
 
 def create_qdrant_collection(collection_name):
+    print(collection_name)
     connection = QdrantClient("localhost", port=6333)    
     connection.create_collection(
         collection_name=collection_name,
         vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
     )
     info = connection.get_collection(collection_name=collection_name)
-    
+    print('info', info)
     return info
 
 

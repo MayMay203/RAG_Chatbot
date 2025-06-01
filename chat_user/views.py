@@ -111,14 +111,22 @@ class MessageView(APIView):
                                 content = gemini_generate_content(prompt)
                                 if int(roleId) != 1:
                                     prompt_2 = f"""
-                                    Từ nội dung văn bản sau, hãy giúp tôi:
-                                    1. Đặt một tiêu đề ngắn gọn, súc tích (name) phản ánh đúng nội dung chính của tài liệu. Tiêu đề không quá 255 ký tự.
-                                    2. Viết một đoạn mô tả ngắn (description) giới thiệu tài liệu, độ dài khoảng 1–2 câu. Tiêu đề không quá 255 ký tự.
+                                        Từ nội dung văn bản sau, hãy giúp tôi:
 
-                                    Nội dung tài liệu:
-                                    \"\"\"{content}\"\"\"
-                                    Trả về kết quả dưới dạng JSON với các khóa: name, description.
-                                    """
+                                        1. Đặt một tiêu đề ngắn gọn, súc tích (name) phản ánh đúng nội dung chính của tài liệu. 
+                                        - Tên không quá 255 ký tự.
+                                        - KHÔNG chứa ký tự đặc biệt như: / \\ : * ? " < > | .
+                                        - KHÔNG có dấu chấm ở đầu dòng, không có khoảng trắng ở đầu/cuối.
+                                        - Được phép chứa dấu cách (khoảng trắng).
+                                        - Đây sẽ được dùng làm **tên của một collection (thư mục)**, vì vậy hãy đảm bảo nó là hợp lệ cho tên file hoặc folder.
+
+                                        2. Viết một đoạn mô tả ngắn (description) giới thiệu tài liệu, độ dài khoảng 1–2 câu.
+
+                                        Nội dung tài liệu:
+                                        \"\"\"{content}\"\"\"
+
+                                        Trả về kết quả dưới dạng JSON với các khóa: `name`, `description`.
+                                        """
                                     result_json = gemini_generate_content(prompt_2)
 
                                     def clean_json_response(response_str):
