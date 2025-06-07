@@ -1,12 +1,6 @@
-# from chat.models import Message
-from langchain import OpenAI, ConversationChain
 from langchain.memory import ConversationBufferMemory
-from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
-from google import genai
 import google.generativeai as genaiModel
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationChain
 import os
 from sklearn.metrics.pairwise import cosine_similarity
 import requests
@@ -15,169 +9,6 @@ from collections import defaultdict
 model = SentenceTransformer('all-MiniLM-L6-v2')
 genaiModel.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini_model = genaiModel.GenerativeModel("gemini-2.0-flash")
-
-# def get_final_prompt(query):
-#     # Get Embeddings
-#     open_ai.api_key = settings.OPENAI_API_KEY
-#     response = open_ai.Embedding.create(
-#         input=query,
-#         model="text-embedding-ada-002"
-#     )
-#     embeddings = response['data'][0]['embedding']
-    
-#     # Qdrant Client search
-#     connection = QdrantClient("localhost", port=6333)
-#     all_collections = [
-#                     'HubSpot_Certification_Study_Guide_2014_pro_ent',
-#                     'hubspot-ebook_river-pools-blogging-case-study',
-#                     'impromptu-rh',
-#                     'small-business-social-media-ebook-hubspot'
-#                 ]
-    
-#     search_results = []
-#     for collection_name in all_collections:
-#         try:
-#             result = connection.search(
-#                 collection_name=collection_name,
-#                 query_vector=embeddings,
-#                 limit=3
-#             )
-#             search_results.extend(result)
-#         except Exception as e:
-#             print(f"Error searching in collection {collection_name}: {e}")
-    
-#     # get final query to pass open_ai
-#     prompt=""
-#     for search_result in search_results:
-#         prompt += search_result.payload["text"]
-    
-#     concatenated_string = f""" This is the previous data or context. \n
-#             {prompt}
-#             \n
-#             Here's the user query from the data or context I have provided. \n
-#             Question: {query} 
-#         """
-
-#     return concatenated_string
-
-# Custom
-
-# Encode label 1 lần duy nhất
-# def get_embedding_store(stores):
-#     for store in stores:
-#         store["embedding"] = model.encode(store["storeDesc"])
-
-# def detect_top_stores_from_query(query, stores, top_k=3, min_similarity=0.5):
-#     query_embedding = model.encode(query)
-#     get_embedding_store(stores)
-    
-#     similarities = []
-#     for store in stores:
-#         sim = cosine_similarity(
-#             [query_embedding],
-#             [store["embedding"]]
-#         )[0][0]
-#         similarities.append((store["storeName"], sim))
-
-#     # Sắp xếp theo similarity giảm dần
-#     similarities.sort(key=lambda x: x[1], reverse=True)
-
-#     # Lọc theo ngưỡng
-#     filtered = [(name, sim) for name, sim in similarities if sim >= min_similarity]
-
-#     # Lấy top K store phù hợp
-#     top_stores = filtered[:top_k]
-
-#     return [store_name for store_name, _ in top_stores]
-
-# def get_final_prompt(query, stores, roleId, top_k=3, min_similarity=0.5):
-#     # Tạo embedding bằng mô hình local
-#     query_embedding = model.encode(query).tolist()
-
-#     # Sử dụng detect_top_stores_from_query để tìm các store liên quan
-#     top_stores = detect_top_stores_from_query(query, stores, top_k, min_similarity)
-
-#     # Kết nối với Qdrant client
-#     connection = QdrantClient("localhost", port=6333)
-
-#     # Xử lí chat với loại tài liệu nào theo roleId
-#     filter = {}
-#     if roleId == 2:
-#         filter = {
-#             "must": [
-#                 {
-#                     "key": "accessLevelType",
-#                     "match": {
-#                         "value": "public"
-#                     }
-#                 }
-#             ]
-#         }
-#     elif roleId == 3:
-#         filter = {
-#             "must": [
-#                 {
-#                     "key": "accessLevelType",
-#                     "match": {
-#                         "any": ["public", "internal"]
-#                     }
-#                 }
-#             ]
-#         }
-
-#     search_results = []    
-#     print('Related store to query', top_stores)
-#     # Lặp qua từng tên store trong top_stores
-#     for store_name in top_stores:
-#         try:
-#             # Lấy danh sách collection (tên tài liệu) liên quan đến store
-#             store = next((store for store in stores if store["storeName"] == store_name), None)
-#             store_collections = store['materials']
-
-#             # 2. Lấy tất cả collections từ Qdrant
-#             qdrant_collections_response = requests.get("http://localhost:6333/collections")
-#             qdrant_collections_data = qdrant_collections_response.json()
-
-#             # 3. Lọc các collection có tên bắt đầu bằng 'collection_'
-#             qdrant_collections = [
-#                 collection['name'] for collection in qdrant_collections_data.get('result', {}).get('collections', [])
-#                 if collection['name'].startswith("collection_")
-#             ]
-
-#             # 4. Gộp và loại bỏ trùng lặp
-#             collections = list(set(store_collections + qdrant_collections))
-#             print(collections)
-#             # Tìm kiếm trong từng collection của store
-#             for collection_name in collections:
-#                 # Gửi yêu cầu HTTP POST đến Qdrant
-#                 result = requests.post(
-#                     f"http://localhost:6333/collections/{collection_name}/points/search",
-#                     json={
-#                         "vector": query_embedding,  # Vector tìm kiếm
-#                         "filter": filter,  # Bộ lọc
-#                         "limit": 3,  # Giới hạn số kết quả
-#                         "with_payload": True,  # Lấy payload
-#                         "with_vector": False  # Không lấy vector
-#                     }
-#                 )
-#                 result_data = result.json()
-#                 print('result_data', result_data)
-#                 for search_result in result_data.get('result', []):
-#                     search_results.append(search_result)
-
-#         except Exception as e:
-#             print(f"Error searching in collection {store_name}: {e}")
-
-#     # Tạo prompt từ kết quả tìm kiếm
-#     prompt = ""
-#     for search_result in search_results:
-#         text = search_result.get("payload", {}).get("text", "")
-#         prompt += text
-
-#     concatenated_string = f"""This is the previous data or context:\n{prompt}\n\nHere's the user query:\nQuestion: {query}"""
-    
-#     return concatenated_string
-
 
 def get_final_prompt(query, roleId):    
     # Step 1: get all collections from qdrant
@@ -256,109 +87,86 @@ def get_final_prompt(query, roleId):
             result += f"- {text}\n"
 
     concatenated_string = f"""
-        Dưới đây là các thông tin liên quan được tìm thấy dựa trên câu hỏi trước đó:
+        2. Các thông tin đã được tìm thấy từ cơ sở dữ liệu (Qdrant) liên quan tới câu hỏi:
 
         {result}
 
-        Vui lòng trả lời chính xác câu hỏi dưới đây dựa trên thông tin đã cho.
-        Không được suy đoán nếu thông tin không có.
-        Phần nguồn thông tin được gom lại, đặt ở cuối câu trả lời theo dạng:
+        Dựa vào các thông tin trên, hãy trả lời chính xác câu hỏi sau.
+        Tuyệt đối không được suy đoán nếu thông tin không có.
+
+        Nếu có nguồn trích dẫn, hãy liệt kê cuối câu trả lời theo định dạng:
         Nguồn:
         1. <url 1>
         2. <url 2>
         Không lặp lại các nguồn giống nhau.
 
+        Nếu không có nguồn, không cần thêm phần nguồn
+
         Câu hỏi: {query}
         """
     return concatenated_string
 
-def get_llm(query, conver_id):
-    memory = ConversationBufferMemory()
-    try:
-        if not conver_id == "" or not conver_id is None:
-            memorybuffer = Message.objects.filter(
-                conversation_id=conver_id).order_by('-created_at')
-
-            for item in memorybuffer:
-                memory.chat_memory.add_user_message(item.query)
-                memory.chat_memory.add_ai_message(item.response)
-            memory.load_memory_variables({})
-    except Exception as e:
-        print(e)
-
-    llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo")
-    conversation = ConversationChain(
-        llm=llm,
-        verbose=True,
-        memory=memory,
-    )
-    output = conversation.predict(input=query)
-    return output
-
-
-
-# def get_llm_qdrant(query, conver_id):
-#     # ghi nhớ hội thoại trước đó, ví dụ tôi là Nhung, hỏi lại t là ai thì nó nhớ
-#     # chat gpt nói ghi nhớ theo id_conver
-#     memory = ConversationBufferMemory()
-#     try:
-#         # promt này là gồm context: cái search được từ qdrant và cả câu hỏi query
-#         prompt = get_final_prompt(query)
-#         memory.chat_memory.add_user_message(prompt)
-#         memory.load_memory_variables({})
-#     except Exception as e:
-#         print(e)
-#     # print(prompt)
-#     llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo")
-#     conversation = ConversationChain(
-#         llm=llm,
-#         verbose=True,
-#         memory=memory,
-#     )
-#     output = conversation.predict(input=query)
-#     return output
-
-# custom
-# Định nghĩa hàm sử dụng Gemini API và bộ nhớ
+# Return answer from gemini API and save memory
+conversations_memory = {}
 def get_llm_qdrant(conversationId, query, roleId):
-    memory = ConversationBufferMemory()
+     # create memory for every conversation
+    if conversationId not in conversations_memory:
+        conversations_memory[conversationId] = ConversationBufferMemory()
+    memory = conversations_memory[conversationId]
 
+    # Step 1: Step 1: Get the last 3 pairs of conversation
+    conversation_history = memory.chat_memory.messages
+    history_text = ""
+    for msg in conversation_history[-10:]:
+        role = "User" if msg.type == "human" else "Bot"
+        history_text += f"{role}: {msg.content}\n"
     try:
-        prompt = get_final_prompt(query, roleId)
-        memory.chat_memory.add_user_message(prompt)  # Thêm câu hỏi vào bộ nhớ
-        memory.load_memory_variables({})  # Load các biến trong bộ nhớ
+        # Prompt from qdrant search result + query
+        rag_prompt = get_final_prompt(query, roleId)
     except Exception as e:
-        print(e)
+        print('Error', e)
+        return "Xin lỗi, hiện tại hệ thống gặp sự cố, bạn vui lòng thử lại sau nhé."
 
-    # Tạo client của Gemini API
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    client = genai.Client(api_key=gemini_api_key)
-    
+     # Step 3: Kết hợp lịch sử hội thoại và prompt mới
+    full_prompt = f"""
+    Bạn là một trợ lý AI chuyên hỗ trợ trả lời các câu hỏi về xúc tiến đầu tư tại Đà Nẵng.
 
-    # Cập nhật prompt bằng cách thêm vào bộ nhớ
-    # Lấy toàn bộ lịch sử hội thoại từ bộ nhớ
-    conversation_history = memory.chat_memory.messages  # Lấy tất cả các tin nhắn trong bộ nhớ
+    1. Dưới đây là lịch sử hội thoại gần nhất giữa người dùng và hệ thống:
+    {history_text}
 
-    # Tạo chuỗi prompt bao gồm lịch sử hội thoại và câu hỏi của người dùng
-    full_prompt = "\n".join([msg.content for msg in conversation_history])
+    ----
 
-    # Gửi yêu cầu tới Gemini API để tạo nội dung với bộ nhớ
-    response = client.models.generate_content(
-        model="gemini-2.0-flash", 
-        contents=full_prompt 
-    )
-    
-    # Trả về kết quả từ Gemini API
+    {rag_prompt}
+    """
+
+    # Step 4: Return answer
+    response = gemini_model.generate_content(full_prompt)
+
+    # Step 5: Save memory
+    memory.chat_memory.add_user_message(query)
+    memory.chat_memory.add_ai_message(response.text)
+
     return response.text
 
 def detect_has_context_with_gemini(user_input: str) -> bool:
     prompt = f"""
-        Xác định xem người dùng có đang cung cấp một đoạn nội dung có ngữ cảnh (context) để hỏi về nó hay không.
+        Bạn là một trợ lý AI.
 
-        Nếu có, trả lời: "True"  
-        Nếu không, trả lời: "False"  
+        Nhiệm vụ của bạn là xác định xem đoạn nhập của người dùng có cung cấp ngữ cảnh tài liệu rõ ràng hay không — nghĩa là có đề cập đến tài liệu đính kèm, liên kết URL, hoặc những nội dung có vẻ như người dùng đang chia sẻ tài liệu để AI đọc và hiểu trước khi trả lời câu hỏi.
 
-        Input: \"\"\"{user_input}\"\"\"
+        Một số ví dụ về ngữ cảnh tài liệu:
+        - "Tôi gửi file dưới đây, giúp tôi tóm tắt."
+        - "Trong văn bản sau, tôi muốn hỏi..."
+        - "Nội dung trong link này là gì?"
+        - Hoặc có chứa các URL liên quan tới file, như Google Drive, Dropbox, hoặc trang web.
+        - Hoặc khi người dùng gửi một đoạn văn bản dài và nói: "Dựa vào đoạn văn bản này, hãy trả lời câu hỏi sau."
+
+        Nếu người dùng chỉ đặt một câu hỏi thông thường hoặc chèn một đoạn văn bản ngắn để hỏi trong đó, thì KHÔNG được coi là ngữ cảnh tài liệu. Trường hợp đó vẫn được xử lý như câu hỏi bình thường.
+
+        Trả lời duy nhất một trong hai giá trị: "True" hoặc "False".
+
+        Input người dùng:
+        \"\"\"{user_input}\"\"\"
         """
     response = gemini_model.generate_content(prompt)
     return "True" in response.text

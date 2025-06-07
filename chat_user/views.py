@@ -101,8 +101,6 @@ class MessageView(APIView):
                                 processed_image = Image.fromarray(thresholded_image)
                                 text = pytesseract.image_to_string(processed_image, config='--psm 6 -c preserve_interword_spaces=1')
                                 content = re.sub(r'[^a-zA-Z0-9\s]', '', text)
-                            # handle save into db
-
                         # URL Website
                         else:
                             try:
