@@ -82,21 +82,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'rag_chatbot.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': env('DB_ENGINE'),
-        'NAME': env('DB_NAME'),
-        'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT'),
-    }
-}
-
-
 #  Other Env variables Import
 OPENAI_API_KEY = env('OPENAI_API_KEY')
 

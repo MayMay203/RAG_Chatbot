@@ -32,7 +32,7 @@ def get_embedding(text_chunks, material):
         3: 'url',
     }
 
-    material_type_id = material.get('materialType', {}).get('id')
+    material_type_id = material.get('materialType', {}).get('id') or 3
     material_name = material.get('url') if material_type_id == 3 else material.get('name')
 
     #  Mỗi chunk ứng với enbedding tương ứng
@@ -43,7 +43,7 @@ def get_embedding(text_chunks, material):
             payload={
               "text": chunk,
               "materialName": material_name,
-              "materialType": typeMap[material.get('materialType').get('id')],
+              "materialType": typeMap[material_type_id] or 'url',  # basic data
               "accessType": material.get('accessType') or 'public',
               "active": True
             }
