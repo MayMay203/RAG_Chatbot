@@ -94,13 +94,24 @@ def get_final_prompt(query, roleId):
         Dựa vào các thông tin trên, hãy trả lời chính xác câu hỏi sau.
         Tuyệt đối không được suy đoán nếu thông tin không có.
 
-        Nếu có nguồn trích dẫn, hãy liệt kê cuối câu trả lời theo định dạng:
+        Nếu câu hỏi được viết bằng tiếng Anh, vui lòng trả lời hoàn toàn bằng tiếng Anh.
+        Nếu câu hỏi được viết bằng tiếng Việt, vui lòng trả lời bằng tiếng Việt.
+
+        Nếu có nguồn trích dẫn, hãy liệt kê cuối câu trả lời theo định dạng **tùy theo ngôn ngữ của câu hỏi**:
+
+        - Nếu câu hỏi bằng tiếng Việt:
         Nguồn:
         1. <url 1>
         2. <url 2>
+
+        - Nếu câu hỏi bằng tiếng Anh:
+        Sources:
+        1. <url 1>
+        2. <url 2>
+
         Không lặp lại các nguồn giống nhau.
 
-        Nếu không có nguồn, không cần thêm phần nguồn
+        Nếu không có nguồn, không cần thêm phần nguồn.
 
         Câu hỏi: {query}
         """
