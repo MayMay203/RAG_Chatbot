@@ -9,6 +9,7 @@ import google.generativeai as genai
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 import google.generativeai as genaiModel
+import requests
 
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -84,3 +85,14 @@ async def fetch_url_content(url: str) -> str:
 def gemini_generate_content(prompt: str) -> str:
     response = gemini_model.generate_content(prompt)
     return response.text
+
+def send_add_basic_materials_request(materialList):
+    url = f"{os.getenv('URL_NEST_SERVER')}/material/add-basic-materials"
+
+    response = requests.post(url, json=materialList)
+
+    if response.status_code == 201:
+        print("Success:", response.status_code, response.json().get("message"))
+    else:
+        print("Error:", response.status_code, response.json().get("message"))
+    

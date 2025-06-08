@@ -1,9 +1,9 @@
 import json
 from qdrant_client import QdrantClient
 from .utils import ( get_text_chunks, get_embedding, 
-                    create_qdrant_collection, add_points_qdrant)
+                    create_qdrant_collection, add_points_qdrant, send_add_basic_materials_request)
 import hashlib
-
+from datetime import datetime, timezone
 
 client = QdrantClient("http://localhost:6333") 
 def collection_is_empty():
@@ -25,10 +25,25 @@ def build_data_once():
 
         with open("data/output.json", "r", encoding="utf-8") as f:
             data = json.load(f)
+        
+        materialList = []
 
         for item in data:
             try:
                 collection_name = url_to_collection_name(item['url'])
+                # save materials to mysql
+                material_data = {
+                                    "name": collection_name,
+                                    "description": " ".join(item["text"].split()[:15]) + "...",
+                                    "url": item['url'],
+                                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                                    "updatedAt": datetime.now(timezone.utc).isoformat(),
+                                    "materialType": {"id": 3},
+                                    "accessLevel": {"id": 1},
+                                    "account": {"id": 1}  # default admin
+                                }
+                materialList.append(material_data)
+                # Save materials to qdrant db
                 create_qdrant_collection(collection_name)
                 content_chunks = get_text_chunks(item['text'])
                 embeddings_points = get_embedding(content_chunks, item)
@@ -36,7 +51,7 @@ def build_data_once():
             except Exception as e:
                 print(f'Lỗi: {e}')
                 raise Exception(f"Error when saving into qdrant: {e}")
-
-        print("Build data successfully!.")
+            
+        send_add_basic_materials_request(materialList)
     else:
         print("Qdrant already has data; skipping rebuild.")
