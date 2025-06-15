@@ -5,23 +5,30 @@ import os
 from sklearn.metrics.pairwise import cosine_similarity
 import requests
 from collections import defaultdict
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue, MatchAny
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 genaiModel.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini_model = genaiModel.GenerativeModel("gemini-2.0-flash")
 
+QDRANT_CLOUD_URL = os.getenv("QDRANT_CLOUD_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+client = QdrantClient(
+    url=QDRANT_CLOUD_URL,
+    api_key=QDRANT_API_KEY
+)
+HEADERS = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {QDRANT_API_KEY}"
+}
+
 def get_final_prompt(query, roleId):    
     # Step 1: get all collections from qdrant
     try:
-        response = requests.get("http://localhost:6333/collections")
-        response.raise_for_status()
-        collections_data = response.json()
-        collections = [
-            col['name']
-            for col in collections_data.get("result", {}).get("collections", [])
-        ]
+        collections = client.get_collections().collections
     except Exception as e:
-        print(f"Error to get collections list: {e}")
+        print(f"Failed to get collections: {e}")
         return "Cannot access Qdrant."
 
     # Step 2: encode query
@@ -30,32 +37,31 @@ def get_final_prompt(query, roleId):
     # Step 3: Define filter by role
     filter = {}
     if roleId == 2:
-        filter = {
-            "must": [
-                {"key": "accessType", "match": {"value": "public"}},
-                {"key": "active", "match": {"value": True}}
+        filter = Filter(
+            must=[
+                FieldCondition(key="accessType", match=MatchValue(value="public")),
+                FieldCondition(key="active", match=MatchValue(value=True))
             ]
-        }
+        )
     elif roleId == 3:
-        filter = {
-            "must": [
-                {"key": "accessType", "match": {"any": ["public", "internal"]}},
-                {"key": "active", "match": {"value": True}}
+        filter = Filter(
+            must=[
+                FieldCondition(key="accessType", match=MatchAny(any=["public", "internal"])),
+                FieldCondition(key="active", match=MatchValue(value=True))
             ]
-        }
+        )
     else:
-        filter = {
-            "must": [
-                {"key": "active", "match": {"value": True}}
-            ]
-        }
+        filter = Filter(
+            must=[FieldCondition(key="active", match=MatchValue(value=True))]
+        )
 
     # Step 4: Search on all collections
     search_results = []
     for collection_name in collections:
         try:
             result = requests.post(
-                f"http://localhost:6333/collections/{collection_name}/points/search",
+                f"{QDRANT_CLOUD_URL}/collections/{collection_name}/points/search",
+                headers=HEADERS,
                 json={
                     "vector": query_embedding,
                     "filter": filter,
@@ -70,7 +76,6 @@ def get_final_prompt(query, roleId):
                 search_results.append(search_result)
         except Exception as e:
             print(f"Search error in collection '{collection_name}': {e}")
-
     # Step 5: Combine the results into Prompt
     grouped_results = defaultdict(list)
 

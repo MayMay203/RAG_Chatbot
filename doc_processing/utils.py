@@ -15,7 +15,13 @@ import requests
 model = SentenceTransformer('all-MiniLM-L6-v2')
 genaiModel.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini_model = genaiModel.GenerativeModel("gemini-2.0-flash")
-connection = QdrantClient("localhost", port=6333)    
+
+QDRANT_CLOUD_URL = os.getenv("QDRANT_CLOUD_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+connection = QdrantClient(
+    url=QDRANT_CLOUD_URL,
+    api_key=QDRANT_API_KEY
+)
 
 def get_text_chunks(text):
   text_splitter = CharacterTextSplitter(

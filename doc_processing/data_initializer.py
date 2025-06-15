@@ -4,8 +4,14 @@ from .utils import ( get_text_chunks, get_embedding,
                     create_qdrant_collection, add_points_qdrant, send_add_basic_materials_request)
 import hashlib
 from datetime import datetime, timezone
+import os
 
-client = QdrantClient("http://localhost:6333") 
+QDRANT_CLOUD_URL = os.getenv("QDRANT_CLOUD_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+client = QdrantClient(
+    url=QDRANT_CLOUD_URL,
+    api_key=QDRANT_API_KEY
+)
 def collection_is_empty():
     try:
         collections = client.get_collections().collections
