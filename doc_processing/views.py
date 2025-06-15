@@ -20,8 +20,12 @@ from rest_framework.exceptions import APIException, ValidationError
 from qdrant_client import QdrantClient
 import asyncio
 
-qdrant_client = QdrantClient("localhost", port=6333)
-
+QDRANT_CLOUD_URL = os.getenv("QDRANT_CLOUD_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+qdrant_client = QdrantClient(
+    url=QDRANT_CLOUD_URL,
+    api_key=QDRANT_API_KEY
+)
 class DocumentDeleteActionView(APIView):
     permission_classes = [AllowAny]
     def delete(self, request):
@@ -29,11 +33,8 @@ class DocumentDeleteActionView(APIView):
 
         if not collection_name:
             raise APIException(f"Collection_name is required!")
-
-        client = QdrantClient(host="localhost", port=6333)
-
         try:
-            client.delete_collection(collection_name=collection_name)
+            qdrant_client.delete_collection(collection_name=collection_name)
             return Response({'message': f'Collection "{collection_name}" deleted successfully'}, status=200)
         except Exception as e:
             raise APIException(f"Delete collection not successfully")
