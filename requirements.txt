@@ -1,4 +1,4 @@
-gunicorn
+gunicorn>=20.0.0
 PyYAML==6.0.1
 qdrant-client==1.8.0
 rank-bm25==0.2.2
