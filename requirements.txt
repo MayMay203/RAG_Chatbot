@@ -18,3 +18,4 @@ Requests==2.32.4
 scikit_learn==1.7.0
 sentence_transformers==4.1.0
 gunicorn
+google-generativeai
