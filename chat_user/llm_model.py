@@ -26,47 +26,46 @@ HEADERS = {
 def get_final_prompt(query, roleId):    
     # Step 1: get all collections from qdrant
     try:
-        collections = client.get_collections().collections
+        response = requests.get("http://localhost:6333/collections")
+        response.raise_for_status()
+        collections_data = response.json()
+        collections = [
+            col['name']
+            for col in collections_data.get("result", {}).get("collections", [])
+        ]
+
     except Exception as e:
-        print(f"Failed to get collections: {e}")
+        print(f"Error to get collections list: {e}")
         return "Cannot access Qdrant."
 
     # Step 2: encode query
     query_embedding = model.encode(query).tolist()
 
     # Step 3: Define filter by role
-    filter = {}
+    filter = {
+        "must": [
+            {"key": "active", "match": {"value": True}} 
+        ]
+    }
+
     if roleId == 2:
-        filter = Filter(
-            must=[
-                FieldCondition(key="accessType", match=MatchValue(value="public")),
-                FieldCondition(key="active", match=MatchValue(value=True))
-            ]
+        filter["must"].append(
+            {"key": "accessType", "match": {"value": 'public'}}
         )
     elif roleId == 3:
-        filter = Filter(
-            must=[
-                FieldCondition(key="accessType", match=MatchAny(any=["public", "internal"])),
-                FieldCondition(key="active", match=MatchValue(value=True))
-            ]
+        filter["must"].append(
+            {"key": "accessType", "match": {"any": ['public', 'internal']}}
         )
-    else:
-        filter = Filter(
-            must=[FieldCondition(key="active", match=MatchValue(value=True))]
-        )
-
+        
     # Step 4: Search on all collections
-    print(filter.model_dump())
     search_results = []
-    for collection in collections:
-        collection_name = collection.name
+    for collection_name in collections:
         try:
             result = requests.post(
-                f"{QDRANT_CLOUD_URL}/collections/{collection_name}/points/search",
-                headers=HEADERS,
+                f"http://localhost:6333/collections/{collection_name}/points/search",
                 json={
                     "vector": query_embedding,
-                    "filter": filter.model_dump(),
+                    "filter": filter,
                     "limit": 3,
                     "with_payload": True,
                     "with_vector": False
@@ -74,6 +73,7 @@ def get_final_prompt(query, roleId):
             )
             result.raise_for_status()
             result_data = result.json()
+            
             for search_result in result_data.get('result', []):
                 search_results.append(search_result)
         except Exception as e:

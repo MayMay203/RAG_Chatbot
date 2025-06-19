@@ -42,9 +42,16 @@ def get_embedding(text_chunks, material):
         2: 'content',
         3: 'url',
     }
+    access_map = {
+        1: 'public',
+        2: 'private',
+        3: 'internal'
+    }
 
     material_type_id = material.get('materialType', {}).get('id') or 3
     material_name = material.get('url') if material_type_id == 3 else material.get('name')
+    access_level_value = material.get('accessLevel', {}).get('id')
+    access_type = access_map.get(access_level_value, 'public')
 
     #  Mỗi chunk ứng với enbedding tương ứng
     for chunk, emb in zip(text_chunks, embeddings):
@@ -55,7 +62,7 @@ def get_embedding(text_chunks, material):
               "text": chunk,
               "materialName": material_name,
               "materialType": typeMap[material_type_id] or 'url',  # basic data
-              "accessType": material.get('accessType') or 'public',
+              "accessType": access_type,
               "active": True
             }
         ))
