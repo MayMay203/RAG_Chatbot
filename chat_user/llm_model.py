@@ -16,7 +16,7 @@ QDRANT_CLOUD_URL = os.getenv("QDRANT_CLOUD_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 client = QdrantClient(
     url=QDRANT_CLOUD_URL,
-    api_key=QDRANT_API_KEY
+    # api_key=QDRANT_API_KEY
 )
 HEADERS = {
     "Content-Type": "application/json",
@@ -56,15 +56,17 @@ def get_final_prompt(query, roleId):
         )
 
     # Step 4: Search on all collections
+    print(filter.model_dump())
     search_results = []
-    for collection_name in collections:
+    for collection in collections:
+        collection_name = collection.name
         try:
             result = requests.post(
                 f"{QDRANT_CLOUD_URL}/collections/{collection_name}/points/search",
                 headers=HEADERS,
                 json={
                     "vector": query_embedding,
-                    "filter": filter,
+                    "filter": filter.model_dump(),
                     "limit": 3,
                     "with_payload": True,
                     "with_vector": False
@@ -130,10 +132,10 @@ def get_llm_qdrant(conversationId, query, roleId):
         conversations_memory[conversationId] = ConversationBufferMemory()
     memory = conversations_memory[conversationId]
 
-    # Step 1: Step 1: Get the last 3 pairs of conversation
+    # Step 1: Step 1: Get the last 10 pairs of conversation
     conversation_history = memory.chat_memory.messages
     history_text = ""
-    for msg in conversation_history[-10:]:
+    for msg in conversation_history[-20:]:
         role = "User" if msg.type == "human" else "Bot"
         history_text += f"{role}: {msg.content}\n"
     try:

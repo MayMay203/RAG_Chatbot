@@ -20,7 +20,7 @@ QDRANT_CLOUD_URL = os.getenv("QDRANT_CLOUD_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 connection = QdrantClient(
     url=QDRANT_CLOUD_URL,
-    api_key=QDRANT_API_KEY
+    # api_key=QDRANT_API_KEY
 )
 
 def get_text_chunks(text):
