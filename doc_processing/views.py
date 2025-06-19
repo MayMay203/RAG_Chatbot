@@ -98,28 +98,32 @@ class DocumentProcessingView(APIView):
                             content = df.to_string(index=False)
 
                         elif "image" in content_type or ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]:
-                            # Mở ảnh và tiền xử lý
-                            image = Image.open(io.BytesIO(response.content))
-                            custom_config = r'--psm 6 -c preserve_interword_spaces=1'
+                            try:
+                                # Mở ảnh và tiền xử lý
+                                image = Image.open(io.BytesIO(response.content))
+                                custom_config = r'--psm 6 -c preserve_interword_spaces=1'
 
-                            # Chuyển ảnh sang dạng xám
-                            gray_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2GRAY)
+                                # Chuyển ảnh sang dạng xám
+                                gray_image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2GRAY)
 
-                            # Áp dụng ngưỡng (thresholding)
-                            _, thresholded_image = cv2.threshold(gray_image, 150, 255, cv2.THRESH_BINARY)
+                                # Áp dụng ngưỡng (thresholding)
+                                _, thresholded_image = cv2.threshold(gray_image, 150, 255, cv2.THRESH_BINARY)
 
-                            # Tạo ảnh sau khi ngưỡng hóa
-                            processed_image = Image.fromarray(thresholded_image)
+                                # Tạo ảnh sau khi ngưỡng hóa
+                                processed_image = Image.fromarray(thresholded_image)
 
-                            # Nhận diện văn bản từ ảnh đã qua xử lý
-                            text = pytesseract.image_to_string(processed_image, config=custom_config)
+                                # Nhận diện văn bản từ ảnh đã qua xử lý
+                                text = pytesseract.image_to_string(processed_image, config=custom_config)
 
-                            # Làm sạch văn bản: chỉ giữ lại các ký tự chữ, số và dấu cách
-                            cleaned_text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+                                # Làm sạch văn bản: chỉ giữ lại các ký tự chữ, số và dấu cách
+                                cleaned_text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
 
-                            # Gán lại nội dung
-                            content = cleaned_text
+                                # Gán lại nội dung
+                                content = cleaned_text
 
+                            except Exception as e:
+                                print(f"[OCR ERROR] Có lỗi xảy ra khi xử lý ảnh: {e}")
+                                content = ""  # hoặc gán None tùy theo nghiệp vụ
                         else:
                             raise ValidationError("File format is not determined or not supported.")
 
@@ -164,8 +168,10 @@ class DocumentActivationView(APIView):
     # toggle active material
     def post(self, request):
         materials = request.data.get("materials") 
+        print(materials)
         
         if not materials or not isinstance(materials, list):
+            print('vo')
             raise APIException("Missing or invalid 'materials' list")
 
         results = []
@@ -183,7 +189,12 @@ class DocumentActivationView(APIView):
                 })
                 continue
 
-            collection_name = f"{material_name}_{material_id}"
+            collection_name = ''
+            if "collection_" not in material_name:
+                collection_name = f"{material_name}_{material_id}"
+            else:
+                collection_name = material_name
+
             try:
                 scroll_result = qdrant_client.scroll(
                     collection_name=collection_name,
@@ -213,6 +224,7 @@ class DocumentActivationView(APIView):
                 })
 
             except Exception as e:
+                print(e)
                 raise APIException(f"Failed to toggle status for material: {e}")
 
         return Response({"results": results}, status=200)
