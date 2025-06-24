@@ -142,7 +142,7 @@ class MessageView(APIView):
                                         "updatedAt": datetime.now(timezone.utc).isoformat(),
                                         "materialType": {"id": 3},
                                         "accessLevel": {"id": 1},
-                                        "account": {"id": accountId}
+                                        "account": None if accountId == 1 else {"id": accountId}
                                     }
                                     send_material_request(material_data, accessToken)
                             except Exception as e:
